@@ -1,1 +1,2 @@
 # nonebot_plugin_guess_number
+基于Nonebot2的猜数字小游戏插件
