@@ -5,9 +5,7 @@ from nonebot.exception import FinishedException
 from nonebot.internal.params import ArgPlainText
 from nonebot.typing import T_State
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, Message
-from nonebot import require
 
-require("nonebot-plugin-follow-withdraw")
 
 guess = on_command("猜数字", aliases={'cai', '猜猜看', '猜', }, priority=99, block=True)
 
@@ -16,7 +14,7 @@ guess = on_command("猜数字", aliases={'cai', '猜猜看', '猜', }, priority=
 async def handle(bot: Bot, event: MessageEvent, state: T_State):
     global answer
     try:
-        await guess.send(f"猜一个1到100的整数，你有5次机会,猜错了会被禁言哦")
+        await guess.send(f"猜一个1到100的整数，你有5次机会,猜错了会被禁言哦.输入 退出 来退出游戏，但会被禁言")
         answer = random.randint(1, 100)
     except FinishedException:
         pass
@@ -26,9 +24,12 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
 
 @guess.got("user_input")
 async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('user_input'), state=T_State):
+    global user_id,max_ban_time
     if user_input.isdigit() and 1 <= int(user_input) <= 100:
         guess_number = int(user_input)
     elif user_input in ["取消", "退出", "结束", "不玩了", "exit"]:
+        await delete_messages(bot, state['bot_messages'])
+        await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
         await guess.finish("游戏退出")
     else:
         guess_number = None

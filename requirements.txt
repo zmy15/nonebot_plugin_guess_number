@@ -1,0 +1,3 @@
+--index-url https://mirrors.aliyun.com/pypi/simple
+
+nonebot-plugin-follow-withdraw==0.2.0
