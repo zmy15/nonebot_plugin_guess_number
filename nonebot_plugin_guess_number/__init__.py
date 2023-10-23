@@ -24,25 +24,40 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
 
 @guess.got("user_input")
 async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('user_input'), state=T_State):
-    global user_id,max_ban_time
+    message_id = event.message_id
+    state['bot_messages'].append(message_id)
+    user_id = event.get_user_id()
+    max_ban_time = random.randint(1, 5)
     if user_input.isdigit() and 1 <= int(user_input) <= 100:
         guess_number = int(user_input)
     elif user_input in ["取消", "退出", "结束", "不玩了", "exit"]:
         await delete_messages(bot, state['bot_messages'])
-        await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
+        try:
+            await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
+        except FinishedException:
+            pass
+        except Exception as e:
+            print(e)
+            msg = "禁言失败~机器人权限不足（请确认bot是否是管理员/禁言到群管）"
+            await guess.finish(Message(f'{msg}'))
         await guess.finish("游戏退出")
     else:
         guess_number = None
         await guess.reject(None)
-    user_id = event.get_user_id()
-    max_ban_time = random.randint(1, 5)
     if guess_number != answer:
         if state['times'] == 5:
             await delete_messages(bot, state['bot_messages'])
             await guess.send('你已经用尽了5次机会，游戏结束。答案是{}。'.format(answer))
-            await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
-            msg = "恭喜您获得" + format_minutes(max_ban_time) + "的禁言"
-            await guess.finish(Message(f'{msg}'))
+            try:
+                await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
+                msg = "恭喜您获得" + format_minutes(max_ban_time) + "的禁言"
+                await guess.finish(Message(f'{msg}'))
+            except FinishedException:
+                pass
+            except Exception as e:
+                print(e)
+                msg = "禁言失败~机器人权限不足（请确认bot是否是管理员/禁言到群管）"
+                await guess.finish(Message(f'{msg}'))
         else:
             state['times'] = state['times'] + 1
     try:
@@ -50,15 +65,9 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
             await delete_messages(bot, state['bot_messages'])
             await guess.finish('恭喜你猜对了！答案就是{}。'.format(answer))
         elif guess_number < answer:
-            await guess.send('猜小了，再试试大一点的数字。')
-            message_id = event.message_id
-            state['bot_messages'].append(message_id)
-            await guess.reject(None)
+            await guess.reject('猜小了，再试试大一点的数字。')
         else:
-            await guess.send('猜大了，再试试小一点的数字。')
-            message_id = event.message_id
-            state['bot_messages'].append(message_id)
-            await guess.reject(None)
+            await guess.reject('猜大了，再试试小一点的数字。')
     except ValueError:
         await guess.reject('请输入一个有效的整数。')
 
@@ -85,5 +94,9 @@ async def delete_messages(bot: Bot, message_ids: list):
         try:
             await bot.delete_msg(message_id=message_id)
             await asyncio.sleep(random.randint(1, 3))
-        except Exception as e:
+        except FinishedException:
             pass
+        except Exception as e:
+            print(e)
+            msg = "撤回失败~机器人权限不足（请确认bot是否是管理员）"
+            await guess.finish(Message(f'{msg}'))
