@@ -26,9 +26,8 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
             remaining_time = (player_last_game_time[user_id] + timedelta(minutes=10)) - now
             await guess.finish(f"游戏休息中，请在{remaining_time.total_seconds():.0f}秒后再进行游戏。",
                                at_sender=True)
-        elif user_id in player_last_game_time and now - player_last_game_time[user_id] > timedelta(minutes=10):
-            del player_last_game_time[user_id]
         else:
+            del player_last_game_time[user_id]
             try:
                 await guess.send(
                     f"猜一个1到100的整数，你有5次机会,猜错了会被禁言哦.输入 退出 来退出游戏，但会被禁言",
