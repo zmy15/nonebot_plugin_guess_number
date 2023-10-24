@@ -93,13 +93,13 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
             del player[0]
             await delete_messages(bot, state['bot_messages'])
         elif guess_number < answer:
-            msg = "猜小了，你还有" + (5 - state['times']) + "次机会"
+            msg = "猜小了，你还有" + str(6 - state['times']) + "次机会"
             await guess.send(Message(f'{msg}'), at_sender=True)
             message_id = event.message_id
             state['bot_messages'].append(message_id)
             await guess.reject(None)
         else:
-            msg = "猜大了，你还有" + (5 - state['times']) + "次机会"
+            msg = "猜大了，你还有" + str(6 - state['times']) + "次机会"
             await guess.send(Message(f'{msg}'), at_sender=True)
             message_id = event.message_id
             state['bot_messages'].append(message_id)
