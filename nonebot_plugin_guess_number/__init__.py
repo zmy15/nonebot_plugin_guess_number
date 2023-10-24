@@ -70,7 +70,8 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
         if state['times'] == 5:
             await guess.send('你已经用尽了5次机会，游戏结束。答案是{}。'.format(answer), at_sender=True)
             try:
-                await bot.set_group_ban(group_id=event.group_id, user_id=state["user_id"][0], duration=60 * max_ban_time)
+                await bot.set_group_ban(group_id=event.group_id, user_id=state["user_id"][0],
+                                        duration=60 * max_ban_time)
                 msg = "恭喜您获得" + format_minutes(max_ban_time) + "的禁言"
                 await guess.send(Message(f'{msg}'))
             except FinishedException:
@@ -92,12 +93,14 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
             del player[0]
             await delete_messages(bot, state['bot_messages'])
         elif guess_number < answer:
-            await guess.send('猜小了，再试试大一点的数字。', at_sender=True)
+            msg = "猜小了，你还有" + (5 - state['times']) + "次机会"
+            await guess.send(Message(f'{msg}'), at_sender=True)
             message_id = event.message_id
             state['bot_messages'].append(message_id)
             await guess.reject(None)
         else:
-            await guess.send('猜大了，再试试小一点的数字。', at_sender=True)
+            msg = "猜大了，你还有" + (5 - state['times']) + "次机会"
+            await guess.send(Message(f'{msg}'), at_sender=True)
             message_id = event.message_id
             state['bot_messages'].append(message_id)
             await guess.reject(None)
