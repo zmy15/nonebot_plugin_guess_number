@@ -28,7 +28,6 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
             await guess.finish(f"游戏休息中，请在{remaining_time.total_seconds():.0f}秒后再进行游戏。",
                                at_sender=True)
         else:
-            del player_last_game_time[user_id]
             try:
                 await guess.send(
                     f"猜一个1到100的整数，你有5次机会,猜错了会被禁言哦.输入 退出 来退出游戏，但会被禁言",
@@ -37,6 +36,9 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
                 answer = random.randint(1, 100)
             except FinishedException:
                 pass
+        state["user_id"] = []
+        if len(state["user_id"]) != 1:
+            state["user_id"].append(user_id)
         state['times'] = 1
         state['bot_messages'] = []
 
@@ -50,7 +52,7 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
         await guess.reject(f"你已经在游戏中，请勿重复进行游戏", at_sender=True)
     elif user_input in ["取消", "退出", "结束", "不玩了", "exit"]:
         try:
-            await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
+            await bot.set_group_ban(group_id=event.group_id, user_id=state["user_id"][0], duration=60 * max_ban_time)
         except FinishedException:
             pass
         except Exception as e:
@@ -68,7 +70,7 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
         if state['times'] == 5:
             await guess.send('你已经用尽了5次机会，游戏结束。答案是{}。'.format(answer), at_sender=True)
             try:
-                await bot.set_group_ban(group_id=event.group_id, user_id=user_id, duration=60 * max_ban_time)
+                await bot.set_group_ban(group_id=event.group_id, user_id=state["user_id"][0], duration=60 * max_ban_time)
                 msg = "恭喜您获得" + format_minutes(max_ban_time) + "的禁言"
                 await guess.send(Message(f'{msg}'))
             except FinishedException:
