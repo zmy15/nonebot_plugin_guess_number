@@ -44,7 +44,7 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
                                at_sender=True)
         else:
             try:
-                msg = "猜一个" + str(min_ban_time) + "到" + str(max_ban_time) + "的整数，你有" + str(try_times) + "机会"
+                msg = "猜一个" + str(number_range_min) + "到" + str(number_range_max) + "的整数，你有" + str(try_times) + "机会"
                 await guess.send(Message(f'{msg}'), at_sender=True)
                 player.append(user_id)
                 answer = random.randint(number_range_min, number_range_max)
