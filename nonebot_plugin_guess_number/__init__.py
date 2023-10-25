@@ -34,7 +34,7 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
     user_id = event.get_user_id()
     now = datetime.now()
     hour = now.hour
-    if game_start_time < hour < game_end_time:
+    if game_start_time <= hour <= game_end_time:
         if len(player) != 0:
             await guess.finish(f"有人正在进行游戏，你现在不能进行游戏", at_sender=True)
         elif user_id in player_last_game_time and now - player_last_game_time[user_id] < timedelta(
