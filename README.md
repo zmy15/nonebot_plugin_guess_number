@@ -5,9 +5,11 @@
 
 支持撤回消息防止刷屏（需要管理员权限，并依赖插件nonebot-plugin-follow-withdraw）
 
+存储游戏数据到./data/user_game_data.json文件中
+
 不确定是否有奇奇怪怪的bug  ~~(毕竟没特意学过python,还有的是chatgpt帮忙写的)~~
 
-以后可能会加入的功能：胜场统计，计算胜率，排名
+以后可能会加入的功能：计算胜率，排名
 
 ## 🔧 ️配置    .env.*
 

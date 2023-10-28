@@ -1,5 +1,7 @@
 import asyncio
 import random
+import os
+import json
 from datetime import datetime, timedelta
 
 import nonebot
@@ -26,12 +28,28 @@ withdraw = guess_number_config.withdraw
 guess = on_command("猜数字", aliases={'cai', '猜猜看'}, priority=99, block=True)
 player_last_game_time = {}
 player = []
+user_game_data = {}
+group_nicknames = {}
+
+data_folder = "data"
+data_file_name = "user_game_data.json"
+
+if not os.path.exists(data_folder):
+    os.makedirs(data_folder)
+
+data_file_path = os.path.join(data_folder, data_file_name)
+
+if os.path.exists(data_file_path):
+    with open(data_file_path, "r") as file:
+        saved_data = json.load(file)
+        user_game_data = saved_data.get("user_game_data", {})
 
 
 @guess.handle()
 async def handle(bot: Bot, event: MessageEvent, state: T_State):
-    global answer, user_id
+    global answer, user_id, user_nickname
     user_id = event.get_user_id()
+    user_nickname = event.sender.nickname
     now = datetime.now()
     hour = now.hour
     if game_start_time <= hour <= game_end_time:
@@ -44,7 +62,8 @@ async def handle(bot: Bot, event: MessageEvent, state: T_State):
                                at_sender=True)
         else:
             try:
-                msg = "猜一个" + str(min_ban_time) + "到" + str(max_ban_time) + "的整数，你有" + str(try_times) + "机会"
+                msg = "猜一个" + str(number_range_min) + "到" + str(number_range_max) + "的整数，你有" + str(
+                    try_times) + "机会"
                 await guess.send(Message(f'{msg}'), at_sender=True)
                 player.append(user_id)
                 answer = random.randint(number_range_min, number_range_max)
@@ -67,7 +86,18 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
     elif user_input in ["猜数字", "cai", "猜猜看"]:
         await guess.reject(f"你已经在游戏中，请勿重复进行游戏", at_sender=True)
     elif user_input in ["取消", "退出", "结束", "不玩了", "exit"]:
-        set_group_ban(bot, event.group_id, state["user_id"][0])
+        if ban:
+            set_group_ban(bot, event.group_id, state["user_id"][0])
+        if user_id in user_game_data:
+            user_game_data[user_id]["games_played"] += 1
+            user_game_data[user_id]["nickname"] = user_nickname
+        else:
+            user_game_data[user_id] = {"games_played": 1, "games_won": 0, "nickname": user_nickname}
+        with open(data_file_path, "w") as file:
+            saved_data = {
+                "user_game_data": user_game_data,
+            }
+            json.dump(saved_data, file)
         await guess.send("游戏退出", at_sender=True)
         del player[0]
         player_last_game_time[user_id] = datetime.now()
@@ -77,9 +107,20 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
         await guess.reject(None)
     if guess_number != answer:
         if state['times'] == try_times:
+            if user_id in user_game_data:
+                user_game_data[user_id]["games_played"] += 1
+                user_game_data[user_id]["nickname"] = user_nickname
+            else:
+                user_game_data[user_id] = {"games_played": 1, "games_won": 0, "nickname": user_nickname}
+            with open(data_file_path, "w") as file:
+                saved_data = {
+                    "user_game_data": user_game_data,
+                }
+                json.dump(saved_data, file)
             msg = "你已用尽了" + str(try_times) + "次机会，游戏结束，答案是" + str(answer)
             await guess.send(Message(f'{msg}'), at_sender=True)
-            set_group_ban(bot, event.group_id, state["user_id"][0])
+            if ban:
+                set_group_ban(bot, event.group_id, state["user_id"][0])
             player_last_game_time[user_id] = datetime.now()
             del player[0]
             await delete_messages(bot, state['bot_messages'])
@@ -87,6 +128,17 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
             state['times'] = state['times'] + 1
     try:
         if guess_number == answer:
+            if user_id in user_game_data:
+                user_game_data[user_id]["games_played"] += 1
+                user_game_data[user_id]["games_won"] += 1
+                user_game_data[user_id]["nickname"] = user_nickname
+            else:
+                user_game_data[user_id] = {"games_played": 1, "games_won": 1, "nickname": user_nickname}
+            with open(data_file_path, "w") as file:
+                saved_data = {
+                    "user_game_data": user_game_data,
+                }
+                json.dump(saved_data, file)
             await guess.send('恭喜你猜对了！答案就是{}。'.format(answer), at_sender=True)
             player_last_game_time[user_id] = datetime.now()
             del player[0]
@@ -108,16 +160,15 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
 
 
 async def set_group_ban(bot: Bot, group_id: int, user_id: int):
-    if ban:
-        ban_time = random.randint(min_ban_time, max_ban_time)
-        try:
-            await bot.set_group_ban(group_id=group_id, user_id=user_id, duration=60 * ban_time)
-        except FinishedException:
-            pass
-        except Exception as e:
-            print(e)
-            msg = "禁言失败~机器人权限不足（请确认bot是否是管理员/禁言到群管）"
-            await guess.send(Message(f'{msg}'), at_sender=True)
+    ban_time = random.randint(min_ban_time, max_ban_time)
+    try:
+        await bot.set_group_ban(group_id=group_id, user_id=user_id, duration=60 * ban_time)
+    except FinishedException:
+        pass
+    except Exception as e:
+        print(e)
+        msg = "禁言失败~机器人权限不足（请确认bot是否是管理员/禁言到群管）"
+        await guess.send(Message(f'{msg}'), at_sender=True)
 
 
 def format_minutes(minutes):
