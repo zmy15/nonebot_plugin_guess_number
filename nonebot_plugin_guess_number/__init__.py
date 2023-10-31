@@ -25,12 +25,10 @@ try_times = guess_number_config.try_times
 ban = guess_number_config.ban
 withdraw = guess_number_config.withdraw
 
-guess = on_command("猜数字", aliases={'cai', '猜猜看'}, priority=99, block=True)
+
 player_last_game_time = {}
 player = []
 user_game_data = {}
-group_nicknames = {}
-
 data_folder = "data"
 data_file_name = "user_game_data.json"
 
@@ -41,8 +39,12 @@ data_file_path = os.path.join(data_folder, data_file_name)
 
 if os.path.exists(data_file_path):
     with open(data_file_path, "r") as file:
-        saved_data = json.load(file)
-        user_game_data = saved_data.get("user_game_data", {})
+        user_game_data = json.load(file)
+
+
+guess = on_command("猜数字", aliases={'cai', '猜猜看'}, priority=99, block=True)
+game_stats = on_command("游戏统计", aliases={"胜率", "统计", "游戏胜率"}, priority=99, block=True)
+ranking = on_command("排名", aliases={"游戏排名", "胜率排名", "胜场排名"}, priority=99, block=True)
 
 
 @guess.handle()
@@ -94,10 +96,7 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
         else:
             user_game_data[user_id] = {"games_played": 1, "games_won": 0, "nickname": user_nickname}
         with open(data_file_path, "w") as file:
-            saved_data = {
-                "user_game_data": user_game_data,
-            }
-            json.dump(saved_data, file)
+            json.dump(user_game_data, file)
         await guess.send("游戏退出", at_sender=True)
         del player[0]
         player_last_game_time[user_id] = datetime.now()
@@ -113,10 +112,7 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
             else:
                 user_game_data[user_id] = {"games_played": 1, "games_won": 0, "nickname": user_nickname}
             with open(data_file_path, "w") as file:
-                saved_data = {
-                    "user_game_data": user_game_data,
-                }
-                json.dump(saved_data, file)
+                json.dump(user_game_data, file)
             msg = "你已用尽了" + str(try_times) + "次机会，游戏结束，答案是" + str(answer)
             await guess.send(Message(f'{msg}'), at_sender=True)
             if ban:
@@ -135,10 +131,7 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
             else:
                 user_game_data[user_id] = {"games_played": 1, "games_won": 1, "nickname": user_nickname}
             with open(data_file_path, "w") as file:
-                saved_data = {
-                    "user_game_data": user_game_data,
-                }
-                json.dump(saved_data, file)
+                json.dump(user_game_data, file)
             await guess.send('恭喜你猜对了！答案就是{}。'.format(answer), at_sender=True)
             player_last_game_time[user_id] = datetime.now()
             del player[0]
@@ -162,7 +155,9 @@ async def got(bot: Bot, event: MessageEvent, user_input: str = ArgPlainText('use
 async def set_group_ban(bot: Bot, group_id: int, user_id: int):
     ban_time = random.randint(min_ban_time, max_ban_time)
     try:
-        await bot.set_group_ban(group_id=group_id, user_id=user_id, duration=60 * ban_time)
+        bot.set_group_ban(group_id=group_id, user_id=user_id, duration=60 * ban_time)
+        msg = "恭喜您获得" + format_minutes(max_ban_time) + "的禁言服务"
+        await guess.send(Message(f'{msg}'), reply_message=True)
     except FinishedException:
         pass
     except Exception as e:
@@ -203,3 +198,55 @@ async def delete_messages(bot: Bot, message_ids: list):
         await guess.finish(None)
     else:
         await guess.finish(None)
+
+
+@game_stats.handle()
+async def handle(event: MessageEvent, bot: Bot):
+    user_id = event.user_id
+    with open(data_file_path, "r") as file:
+        user_game_data = json.load(file)
+
+    if user_id in user_game_data:
+        games_played = user_game_data[user_id]["games_played"]
+        games_won = user_game_data[user_id]["games_won"]
+        user_nickname = user_game_data[user_id]["nickname"]
+
+        if games_played > 0:
+            win_rate = (games_won / games_played) * 100  # 计算胜率
+        else:
+            win_rate = 0
+
+        await game_stats.finish(
+            f"{user_nickname} 的游戏统计数据：\n已玩游戏场数: {games_played}\n获胜场数: {games_won}\n"
+            f",胜率：{win_rate:.2f}%", at_sender=True)
+    else:
+        await game_stats.finish("您还没有玩过游戏。", at_sender=True)
+
+
+@ranking.handle()
+async def handle(bot: Bot):
+    if not user_game_data:
+        await game_stats.finish("尚无用户游戏数据。")
+
+        # 计算每个用户的胜率
+    user_win_rates = {}
+    for user_id, data in user_game_data.items():
+        games_played = data.get("games_played", 0)
+        games_won = data.get("games_won", 0)
+        if games_played > 0:
+            win_rate = (games_won / games_played) * 100
+        else:
+            win_rate = 0
+        user_win_rates[user_id] = {"nickname": data["nickname"], "win_rate": win_rate}
+
+    # 对用户胜率进行排序
+    ranked_users = sorted(user_win_rates.items(), key=lambda x: x[1]["win_rate"], reverse=True)
+
+    # 显示排名
+    rank_msg = "胜率排名：\n"
+    for rank, (user_id, data) in enumerate(ranked_users, start=1):
+        user_nickname = data["nickname"]
+        win_rate = data["win_rate"]
+        rank_msg += f"{rank}. {user_nickname} - 胜率: {win_rate:.2f}%\n"
+
+    await game_stats.finish(rank_msg)
